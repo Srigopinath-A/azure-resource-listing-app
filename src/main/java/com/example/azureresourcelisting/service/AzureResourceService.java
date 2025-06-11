@@ -1,10 +1,13 @@
 package com.example.azureresourcelisting.service;
 
 
+import com.azure.core.http.rest.PagedIterable;
+import com.azure.core.management.exception.ManagementException;
 import com.azure.resourcemanager.AzureResourceManager;
 import com.azure.resourcemanager.appservice.models.WebApp;
 import com.azure.resourcemanager.compute.models.VirtualMachine;
 import com.azure.resourcemanager.resources.models.GenericResource;
+import com.azure.resourcemanager.resources.models.ResourceGroup;
 import com.example.azureresourcelisting.model.ResourceInfo;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +15,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -128,4 +133,51 @@ public AzureResourceService(@Qualifier("azureResourceManager") AzureResourceMana
         return tagsOptional.orElse(null);
     }
 
+    public Map<String, String> updateTagsByName(String resourceName, Map<String, String> tagsToUpdate) {
+        
+        System.out.println("--- Starting search for resource: '" + resourceName + "' ---");
+
+        // 1. Get all resource groups first. This is a relatively fast operation.
+        PagedIterable<ResourceGroup> groups = azure.resourceGroups().list();
+
+        System.out.println("Found " + groups.stream().count() + " resource groups. Searching within each...");
+
+        for (ResourceGroup group : groups) {
+            
+            System.out.println("...Searching in resource group: '" + group.name() + "'");
+            
+            // 2. Search for the resource only within this specific resource group.
+            Optional<GenericResource> resourceOptional = azure.genericResources()
+                    .listByResourceGroup(group.name())
+                    .stream()
+                    .filter(r -> r.name().equalsIgnoreCase(resourceName))
+                    .findFirst();
+
+            // 3. If the resource was found in this group, update it and return.
+            if (resourceOptional.isPresent()) {
+                GenericResource resourceToUpdate = resourceOptional.get();
+                
+                System.out.println("SUCCESS: Found resource '" + resourceName + "' in group '" + group.name() + "'.");
+
+                // 4. Merge tags safely.
+                Map<String, String> newTags = new HashMap<>();
+                if (resourceToUpdate.tags() != null) {
+                    newTags.putAll(resourceToUpdate.tags());
+                }
+                newTags.putAll(tagsToUpdate);
+
+                // 5. Apply the update and capture the new, consistent object.
+                GenericResource updatedResource = resourceToUpdate.update()
+                        .withTags(newTags)
+                        .apply();
+                
+                System.out.println("SUCCESS: Tags updated for '" + resourceName + "'.\n");
+                return updatedResource.tags(); // Task complete, exit the method.
+            }
+        }
+
+        // 6. If the loop finishes and we haven't found the resource, it doesn't exist.
+        System.err.println("ERROR: Resource '" + resourceName + "' was not found in any resource group.\n");
+        return null;
+    }
 }

@@ -12,6 +12,7 @@ import com.azure.core.management.AzureEnvironment;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 
 @Configuration
 public class AzureConfig {
@@ -47,4 +48,5 @@ public AzureResourceManager azureResourceManagerWithDefaultCredential() {
             .authenticate(new DefaultAzureCredentialBuilder().build(), profile)
             .withSubscription(subscriptionId);
 }
+
 }

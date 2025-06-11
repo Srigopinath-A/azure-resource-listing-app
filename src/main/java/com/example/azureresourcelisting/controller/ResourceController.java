@@ -4,9 +4,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import org.springframework.http.HttpHeaders;
@@ -96,6 +100,27 @@ public ResponseEntity<List<String>> getTagsForResource(String type, String name)
             // log.error("Error fetching tags for type={} name={}", resourceType, resourceName, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Collections.singletonMap("error", "An internal error occurred: " + e.getMessage()));
+        }
+    }
+
+     @PatchMapping("/resources/{resourceName}/tags")
+    public ResponseEntity<Map<String, String>> updateTagsByResourceName(
+            @PathVariable String resourceName,
+            @RequestBody Map<String, String> tagsToUpdate) {
+        try {
+            Map<String, String> updatedTags = azureResourceService.updateTagsByName(resourceName, tagsToUpdate);
+
+            if (updatedTags == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Resource named '" + resourceName + "' not found anywhere in the subscription."));
+            }
+
+            return ResponseEntity.ok(updatedTags);
+
+        } catch (Exception e) {
+            // This catches authentication errors or other Azure SDK issues.
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "An internal Azure error occurred: " + e.getMessage()));
         }
     }
 }
