@@ -134,50 +134,68 @@ public AzureResourceService(@Qualifier("azureResourceManager") AzureResourceMana
     }
 
     public Map<String, String> updateTagsByName(String resourceName, Map<String, String> tagsToUpdate) {
+    
+    System.out.println("--- Starting search for resource: '" + resourceName + "' ---");
+
+    PagedIterable<ResourceGroup> groups = azure.resourceGroups().list();
+
+    // === THE FIX ===
+    // 1. Collect the items from the one-time iterable into a permanent List.
+    List<ResourceGroup> groupList = groups.stream().collect(Collectors.toList());
+    
+    System.out.println("Found " + groupList.size() + " resource groups. Now searching within each...");
+
+    // 2. Now, iterate over the List. This can be done safely.
+    for (ResourceGroup group : groupList) {
         
-        System.out.println("--- Starting search for resource: '" + resourceName + "' ---");
+        System.out.println("...Searching in resource group: '" + group.name() + "'");
+        
+        Optional<GenericResource> resourceOptional = azure.genericResources()
+                .listByResourceGroup(group.name())
+                .stream()
+                .filter(r -> r.name().equalsIgnoreCase(resourceName))
+                .findFirst();
 
-        // 1. Get all resource groups first. This is a relatively fast operation.
-        PagedIterable<ResourceGroup> groups = azure.resourceGroups().list();
+        if (resourceOptional.isPresent()) {
+            GenericResource resourceToUpdate = resourceOptional.get();
+            System.out.println("SUCCESS: Found resource '" + resourceName + "' in group '" + group.name() + "'.");
 
-        System.out.println("Found " + groups.stream().count() + " resource groups. Searching within each...");
-
-        for (ResourceGroup group : groups) {
-            
-            System.out.println("...Searching in resource group: '" + group.name() + "'");
-            
-            // 2. Search for the resource only within this specific resource group.
-            Optional<GenericResource> resourceOptional = azure.genericResources()
-                    .listByResourceGroup(group.name())
-                    .stream()
-                    .filter(r -> r.name().equalsIgnoreCase(resourceName))
-                    .findFirst();
-
-            // 3. If the resource was found in this group, update it and return.
-            if (resourceOptional.isPresent()) {
-                GenericResource resourceToUpdate = resourceOptional.get();
-                
-                System.out.println("SUCCESS: Found resource '" + resourceName + "' in group '" + group.name() + "'.");
-
-                // 4. Merge tags safely.
-                Map<String, String> newTags = new HashMap<>();
-                if (resourceToUpdate.tags() != null) {
-                    newTags.putAll(resourceToUpdate.tags());
-                }
-                newTags.putAll(tagsToUpdate);
-
-                // 5. Apply the update and capture the new, consistent object.
-                GenericResource updatedResource = resourceToUpdate.update()
-                        .withTags(newTags)
-                        .apply();
-                
-                System.out.println("SUCCESS: Tags updated for '" + resourceName + "'.\n");
-                return updatedResource.tags(); // Task complete, exit the method.
+            Map<String, String> newTags = new HashMap<>();
+            if (resourceToUpdate.tags() != null) {
+                newTags.putAll(resourceToUpdate.tags());
             }
-        }
+            newTags.putAll(tagsToUpdate);
 
-        // 6. If the loop finishes and we haven't found the resource, it doesn't exist.
-        System.err.println("ERROR: Resource '" + resourceName + "' was not found in any resource group.\n");
-        return null;
+            System.out.println("Attempting to apply new tags: " + newTags);
+            
+            // Apply the update
+            GenericResource updatedResource = resourceToUpdate.update()
+                    .withTags(newTags)
+                    .apply();
+
+            // Best Practice: To be 100% sure, return the tags from the object that was returned by .apply()
+            System.out.println("SUCCESS: Tags updated for '" + resourceName + "'.\n");
+            return updatedResource.tags(); // Task complete, exit.
+        }
     }
+
+    System.err.println("ERROR: Resource '" + resourceName + "' was not found in any resource group.\n");
+    return null;
+}
+
+ public Map<String, String> getTagsByName(String resourceName) {
+        
+        System.out.println("--- Starting subscription-wide search for resource: '" + resourceName + "' ---");
+
+        // 1. Search ALL generic resources in the subscription. THIS IS THE SLOW PART.
+        Optional<GenericResource> genericResourceOptional = azure.genericResources().list().stream()
+                .filter(resource -> resource.name().equalsIgnoreCase(resourceName))
+                .findFirst(); // Find the first resource that matches the name.
+
+        // 2. Use modern Java 'map' to get the tags if the resource was found.
+        // If the resource was found, this returns its tags (which could be an empty map).
+        // If the resource was NOT found, this returns null.
+        return genericResourceOptional.map(GenericResource::tags).orElse(null);
+    }
+
 }

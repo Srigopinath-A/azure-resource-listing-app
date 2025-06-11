@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 public class ResourceController {
@@ -65,62 +66,118 @@ public ResponseEntity<byte[]> exportResourcesToCsv() {
     }
 }
 
-    @GetMapping("/resources/tags")
-public ResponseEntity<List<String>> getTagsForResource(String type, String name) {
-    try {
-        List<String> tags = azureResourceService.getTagsForResource(type, name);
-        if (tags.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        }
-        return ResponseEntity.ok(tags);
-    } catch (Exception e) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-    }
-}
+//     @GetMapping("/resources/tags")
+// public ResponseEntity<List<String>> getTagsForResource(String type, String name) {
+//     try {
+//         List<String> tags = azureResourceService.getTagsForResource(type, name);
+//         if (tags.isEmpty()) {
+//             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+//         }
+//         return ResponseEntity.ok(tags);
+//     } catch (Exception e) {
+//         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+//     }
+// }
 
- @GetMapping("/resources/tagsJson")
-    public ResponseEntity<Map<String, String>> getTagsForResourcej(
-            @RequestParam("type") String resourceType,
-            @RequestParam("name") String resourceName) {
+//  @GetMapping("/resources/tagsJson")
+//     public ResponseEntity<Map<String, String>> getTagsForResourcej(
+//             @RequestParam("type") String resourceType,
+//             @RequestParam("name") String resourceName) {
         
+//         try {
+//             Map<String, String> tags = azureResourceService.findTagsByNameAndType(resourceType, resourceName);
+
+//             // The service returns null if no matching resource was found
+//             if (tags == null) {
+//                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
+//                         .body(Collections.singletonMap("error", "Resource not found with type '" + resourceType + "' and name '" + resourceName + "'"));
+//             }
+
+//             // If found, return the tags. Spring Boot automatically makes this a JSON object.
+//             // If the resource exists but has no tags, this will correctly return an empty JSON object: {}
+//             return ResponseEntity.ok(tags);
+
+//         } catch (Exception e) {
+//             // log.error("Error fetching tags for type={} name={}", resourceType, resourceName, e);
+//             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//                     .body(Collections.singletonMap("error", "An internal error occurred: " + e.getMessage()));
+//         }
+//     }
+
+    //  @PatchMapping("/resources/{resourceName}/tags")
+    // public ResponseEntity<Map<String, String>> updateTagsByResourceName(
+    //         @PathVariable String resourceName,
+    //         @RequestBody Map<String, String> tagsToUpdate) {
+    //     try {
+    //         Map<String, String> updatedTags = azureResourceService.updateTagsByName(resourceName, tagsToUpdate);
+
+    //         if (updatedTags == null) {
+    //             return ResponseEntity.status(HttpStatus.NOT_FOUND)
+    //                     .body(Map.of("error", "Resource named '" + resourceName + "' not found anywhere in the subscription."));
+    //         }
+
+    //         return ResponseEntity.ok(updatedTags);
+
+    //     } catch (Exception e) {
+    //         // This catches authentication errors or other Azure SDK issues.
+    //         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+    //                 .body(Map.of("error", "An internal Azure error occurred: " + e.getMessage()));
+    //     }
+    // }
+
+    @GetMapping("/test/updatetags")
+    public ResponseEntity<Map<String, String>> testUpdateTags() {
+        
+        // --- 1. DEFINE YOUR TEST DATA HERE ---
+        // Change these values whenever you want to test a different resource or tag.
+        String resourceNameToUpdate = "vm-wplite-avnbwl-p-dr-wus"; 
+        Map<String, String> tagsToApply = Map.of(
+            "environment", "DR"
+        );
+        // ------------------------------------
+
+        System.out.println("--- RUNNING HARDCODED TEST ---");
+        System.out.println("Attempting to update resource: '" + resourceNameToUpdate + "'");
+        System.out.println("With tags: " + tagsToApply);
+
+        // 2. Call the existing service logic with the hardcoded data.
         try {
-            Map<String, String> tags = azureResourceService.findTagsByNameAndType(resourceType, resourceName);
+            Map<String, String> updatedTags = azureResourceService.updateTagsByName(resourceNameToUpdate, tagsToApply);
 
-            // The service returns null if no matching resource was found
-            if (tags == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Collections.singletonMap("error", "Resource not found with type '" + resourceType + "' and name '" + resourceName + "'"));
-            }
-
-            // If found, return the tags. Spring Boot automatically makes this a JSON object.
-            // If the resource exists but has no tags, this will correctly return an empty JSON object: {}
-            return ResponseEntity.ok(tags);
-
-        } catch (Exception e) {
-            // log.error("Error fetching tags for type={} name={}", resourceType, resourceName, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Collections.singletonMap("error", "An internal error occurred: " + e.getMessage()));
-        }
-    }
-
-     @PatchMapping("/resources/{resourceName}/tags")
-    public ResponseEntity<Map<String, String>> updateTagsByResourceName(
-            @PathVariable String resourceName,
-            @RequestBody Map<String, String> tagsToUpdate) {
-        try {
-            Map<String, String> updatedTags = azureResourceService.updateTagsByName(resourceName, tagsToUpdate);
-
+            // 3. Return the response directly to the browser.
             if (updatedTags == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("error", "Resource named '" + resourceName + "' not found anywhere in the subscription."));
+                        .body(Map.of("error", "Resource named '" + resourceNameToUpdate + "' not found."));
             }
-
             return ResponseEntity.ok(updatedTags);
 
         } catch (Exception e) {
-            // This catches authentication errors or other Azure SDK issues.
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "An internal Azure error occurred: " + e.getMessage()));
         }
     }
+
+  @GetMapping("/tags/{resourceName}")
+    public ResponseEntity<Map<String, String>> getTagsByResourceName(@PathVariable String resourceName) {
+        try {
+            // Call the new, simpler service method
+            Map<String, String> tags = azureResourceService.getTagsByName(resourceName);
+
+            // The service returns null if no resource was found
+            if (tags == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Collections.singletonMap("error", "Resource named '" + resourceName + "' not found anywhere in the subscription."));
+            }
+
+            // If found, return the tags. This will correctly be a JSON object.
+            // If the resource has no tags, it will return an empty object: {}
+            return ResponseEntity.ok(tags);
+
+        } catch (Exception e) {
+            // This catches authentication errors or other Azure SDK issues
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("error", "An internal Azure error occurred: " + e.getMessage()));
+        }
+    }
+
 }
