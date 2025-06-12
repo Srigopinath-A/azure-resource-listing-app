@@ -8,13 +8,16 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import org.springframework.http.HttpHeaders;
 import com.example.azureresourcelisting.model.ResourceInfo;
+import com.example.azureresourcelisting.model.UpdateTagsRequest;
 import com.example.azureresourcelisting.service.AzureResourceService;
 
 import java.nio.charset.StandardCharsets;
@@ -24,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @RestController
+@RequestMapping("/api")
 public class ResourceController {
 
     private final AzureResourceService azureResourceService;
@@ -177,6 +181,42 @@ public ResponseEntity<byte[]> exportResourcesToCsv() {
             // This catches authentication errors or other Azure SDK issues
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Collections.singletonMap("error", "An internal Azure error occurred: " + e.getMessage()));
+        }
+    }
+
+     @PostMapping("resource/update-tags") // Changed from GetMapping to PostMapping
+    public ResponseEntity<Map<String, String>> updateTags(@RequestBody UpdateTagsRequest request) {
+        
+        // 1. Get data from the request, not from hardcoded values
+        String resourceNameToUpdate = request.getResourceName();
+        Map<String, String> tagsToApply = request.getTags();
+        
+        // --- Optional: Add validation ---
+        if (resourceNameToUpdate == null || resourceNameToUpdate.isBlank() || tagsToApply == null || tagsToApply.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "resourceName and tags fields are required."));
+        }
+        // -----------------------------
+
+        System.out.println("--- RECEIVED API REQUEST ---");
+        System.out.println("Attempting to update resource: '" + resourceNameToUpdate + "'");
+        System.out.println("With tags: " + tagsToApply);
+
+        // 2. Call the service logic (your service code doesn't need to change!)
+        try {
+            Map<String, String> updatedTags = azureResourceService.updateTagsByName(resourceNameToUpdate, tagsToApply);
+
+            // 3. Return the response
+            if (updatedTags == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Resource named '" + resourceNameToUpdate + "' not found."));
+            }
+            return ResponseEntity.ok(updatedTags);
+
+        } catch (Exception e) {
+            // Log the exception for debugging
+            e.printStackTrace(); 
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "An internal Azure error occurred: " + e.getMessage()));
         }
     }
 
