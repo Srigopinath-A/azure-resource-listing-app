@@ -9,12 +9,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @EnableWebMvc
 public class WebConfig implements WebMvcConfigurer {
 
+    
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**") // Apply to all endpoints under /api
-            .allowedOrigins("http://127.0.0.1:5500", "http://localhost:5500") // Whitelist your frontend's origin
-            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // Allowed HTTP methods
-            .allowedHeaders("*") // Allow all headers
-            .allowCredentials(true);
+      registry.addMapping("/api/**") // Apply to ALL endpoints under /api/*
+        // IMPORTANT: Whitelist the exact origin from the error message, plus its "localhost" equivalent.
+        .allowedOrigins("http://localhost:3000", "http://127.0.0.1:3000") 
+        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // Allow all necessary methods
+        .allowedHeaders("*") // Allow all headers to be sent
+        .allowCredentials(true) // Crucial for sending session cookies
+        .maxAge(3600); // Optional: cache preflight response for 1 hour
     }
 }
